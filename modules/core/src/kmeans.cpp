@@ -219,11 +219,13 @@ double cv::kmeans( InputArray _data, int K,
                    TermCriteria criteria, int attempts,
                    int flags, OutputArray _centers )
 {
+    CV_INSTRUMENT_REGION()
+
     const int SPP_TRIALS = 3;
     Mat data0 = _data.getMat();
-    bool isrow = data0.rows == 1 && data0.channels() > 1;
-    int N = !isrow ? data0.rows : data0.cols;
-    int dims = (!isrow ? data0.cols : 1)*data0.channels();
+    bool isrow = data0.rows == 1;
+    int N = isrow ? data0.cols : data0.rows;
+    int dims = (isrow ? 1 : data0.cols)*data0.channels();
     int type = data0.depth();
 
     attempts = std::max(attempts, 1);

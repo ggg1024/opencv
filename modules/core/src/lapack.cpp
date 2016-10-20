@@ -52,22 +52,30 @@ namespace cv
 
 int LU(float* A, size_t astep, int m, float* b, size_t bstep, int n)
 {
-    return hal::LU(A, astep, m, b, bstep, n);
+    CV_INSTRUMENT_REGION()
+
+    return hal::LU32f(A, astep, m, b, bstep, n);
 }
 
 int LU(double* A, size_t astep, int m, double* b, size_t bstep, int n)
 {
-    return hal::LU(A, astep, m, b, bstep, n);
+    CV_INSTRUMENT_REGION()
+
+    return hal::LU64f(A, astep, m, b, bstep, n);
 }
 
 bool Cholesky(float* A, size_t astep, int m, float* b, size_t bstep, int n)
 {
-    return hal::Cholesky(A, astep, m, b, bstep, n);
+    CV_INSTRUMENT_REGION()
+
+    return hal::Cholesky32f(A, astep, m, b, bstep, n);
 }
 
 bool Cholesky(double* A, size_t astep, int m, double* b, size_t bstep, int n)
 {
-    return hal::Cholesky(A, astep, m, b, bstep, n);
+    CV_INSTRUMENT_REGION()
+
+    return hal::Cholesky64f(A, astep, m, b, bstep, n);
 }
 
 template<typename _Tp> static inline _Tp hypot(_Tp a, _Tp b)
@@ -570,11 +578,44 @@ JacobiSVDImpl_(_Tp* At, size_t astep, _Tp* _W, _Tp* Vt, size_t vstep,
 
 static void JacobiSVD(float* At, size_t astep, float* W, float* Vt, size_t vstep, int m, int n, int n1=-1)
 {
-    JacobiSVDImpl_(At, astep, W, Vt, vstep, m, n, !Vt ? 0 : n1 < 0 ? n : n1, FLT_MIN, FLT_EPSILON*2);
+    hal::SVD32f(At, astep, W, NULL, astep, Vt, vstep, m, n, n1);
 }
 
 static void JacobiSVD(double* At, size_t astep, double* W, double* Vt, size_t vstep, int m, int n, int n1=-1)
 {
+    hal::SVD64f(At, astep, W, NULL, astep, Vt, vstep, m, n, n1);
+}
+
+template <typename fptype> static inline int
+decodeSVDParameters(const fptype* U, const fptype* Vt, int m, int n, int n1)
+{
+    int halSVDFlag = 0;
+    if(Vt == NULL)
+        halSVDFlag = CV_HAL_SVD_NO_UV;
+    else if(n1 <= 0 || n1 == n)
+    {
+        halSVDFlag = CV_HAL_SVD_SHORT_UV;
+        if(U == NULL)
+            halSVDFlag |= CV_HAL_SVD_MODIFY_A;
+    }
+    else if(n1 == m)
+    {
+        halSVDFlag = CV_HAL_SVD_FULL_UV;
+        if(U == NULL)
+            halSVDFlag |= CV_HAL_SVD_MODIFY_A;
+    }
+    return halSVDFlag;
+}
+
+void hal::SVD32f(float* At, size_t astep, float* W, float* U, size_t ustep, float* Vt, size_t vstep, int m, int n, int n1)
+{
+    CALL_HAL(SVD32f, cv_hal_SVD32f, At, astep, W, U, ustep, Vt, vstep, m, n, decodeSVDParameters(U, Vt, m, n, n1))
+    JacobiSVDImpl_(At, astep, W, Vt, vstep, m, n, !Vt ? 0 : n1 < 0 ? n : n1, FLT_MIN, FLT_EPSILON*2);
+}
+
+void hal::SVD64f(double* At, size_t astep, double* W, double* U, size_t ustep, double* Vt, size_t vstep, int m, int n, int n1)
+{
+    CALL_HAL(SVD64f, cv_hal_SVD64f, At, astep, W, U, ustep, Vt, vstep, m, n, decodeSVDParameters(U, Vt, m, n, n1))
     JacobiSVDImpl_(At, astep, W, Vt, vstep, m, n, !Vt ? 0 : n1 < 0 ? n : n1, DBL_MIN, DBL_EPSILON*10);
 }
 
@@ -713,6 +754,8 @@ SVBkSb( int m, int n, const double* w, size_t wstep,
 
 double cv::determinant( InputArray _mat )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat mat = _mat.getMat();
     double result = 0;
     int type = mat.type(), rows = mat.rows;
@@ -740,12 +783,11 @@ double cv::determinant( InputArray _mat )
             Mat a(rows, rows, CV_32F, (uchar*)buffer);
             mat.copyTo(a);
 
-            result = hal::LU(a.ptr<float>(), a.step, rows, 0, 0, 0);
+            result = hal::LU32f(a.ptr<float>(), a.step, rows, 0, 0, 0);
             if( result )
             {
                 for( int i = 0; i < rows; i++ )
                     result *= a.at<float>(i,i);
-                result = 1./result;
             }
         }
     }
@@ -764,12 +806,11 @@ double cv::determinant( InputArray _mat )
             Mat a(rows, rows, CV_64F, (uchar*)buffer);
             mat.copyTo(a);
 
-            result = hal::LU(a.ptr<double>(), a.step, rows, 0, 0, 0);
+            result = hal::LU64f(a.ptr<double>(), a.step, rows, 0, 0, 0);
             if( result )
             {
                 for( int i = 0; i < rows; i++ )
                     result *= a.at<double>(i,i);
-                result = 1./result;
             }
         }
     }
@@ -791,6 +832,8 @@ double cv::determinant( InputArray _mat )
 
 double cv::invert( InputArray _src, OutputArray _dst, int method )
 {
+    CV_INSTRUMENT_REGION()
+
     bool result = false;
     Mat src = _src.getMat();
     int type = src.type();
@@ -1027,13 +1070,13 @@ double cv::invert( InputArray _src, OutputArray _dst, int method )
     setIdentity(dst);
 
     if( method == DECOMP_LU && type == CV_32F )
-        result = hal::LU(src1.ptr<float>(), src1.step, n, dst.ptr<float>(), dst.step, n) != 0;
+        result = hal::LU32f(src1.ptr<float>(), src1.step, n, dst.ptr<float>(), dst.step, n) != 0;
     else if( method == DECOMP_LU && type == CV_64F )
-        result = hal::LU(src1.ptr<double>(), src1.step, n, dst.ptr<double>(), dst.step, n) != 0;
+        result = hal::LU64f(src1.ptr<double>(), src1.step, n, dst.ptr<double>(), dst.step, n) != 0;
     else if( method == DECOMP_CHOLESKY && type == CV_32F )
-        result = hal::Cholesky(src1.ptr<float>(), src1.step, n, dst.ptr<float>(), dst.step, n);
+        result = hal::Cholesky32f(src1.ptr<float>(), src1.step, n, dst.ptr<float>(), dst.step, n);
     else
-        result = hal::Cholesky(src1.ptr<double>(), src1.step, n, dst.ptr<double>(), dst.step, n);
+        result = hal::Cholesky64f(src1.ptr<double>(), src1.step, n, dst.ptr<double>(), dst.step, n);
 
     if( !result )
         dst = Scalar(0);
@@ -1049,6 +1092,8 @@ double cv::invert( InputArray _src, OutputArray _dst, int method )
 
 bool cv::solve( InputArray _src, InputArray _src2arg, OutputArray _dst, int method )
 {
+    CV_INSTRUMENT_REGION()
+
     bool result = true;
     Mat src = _src.getMat(), _src2 = _src2arg.getMat();
     int type = src.type();
@@ -1193,9 +1238,6 @@ bool cv::solve( InputArray _src, InputArray _src2arg, OutputArray _dst, int meth
         return result;
     }
 
-    if( method == DECOMP_QR )
-        method = DECOMP_SVD;
-
     int m = src.rows, m_ = m, n = src.cols, nb = _src2.cols;
     size_t esz = CV_ELEM_SIZE(type), bufsize = 0;
     size_t vstep = alignSize(n*esz, 16);
@@ -1223,7 +1265,6 @@ bool cv::solve( InputArray _src, InputArray _src2arg, OutputArray _dst, int meth
 
     if( is_normal )
         bufsize += n*nb*esz;
-
     if( method == DECOMP_SVD || method == DECOMP_EIG )
         bufsize += n*5*esz + n*vstep + nb*sizeof(double) + 32;
 
@@ -1265,16 +1306,38 @@ bool cv::solve( InputArray _src, InputArray _src2arg, OutputArray _dst, int meth
     if( method == DECOMP_LU )
     {
         if( type == CV_32F )
-            result = hal::LU(a.ptr<float>(), a.step, n, dst.ptr<float>(), dst.step, nb) != 0;
+            result = hal::LU32f(a.ptr<float>(), a.step, n, dst.ptr<float>(), dst.step, nb) != 0;
         else
-            result = hal::LU(a.ptr<double>(), a.step, n, dst.ptr<double>(), dst.step, nb) != 0;
+            result = hal::LU64f(a.ptr<double>(), a.step, n, dst.ptr<double>(), dst.step, nb) != 0;
     }
     else if( method == DECOMP_CHOLESKY )
     {
         if( type == CV_32F )
-            result = hal::Cholesky(a.ptr<float>(), a.step, n, dst.ptr<float>(), dst.step, nb);
+            result = hal::Cholesky32f(a.ptr<float>(), a.step, n, dst.ptr<float>(), dst.step, nb);
         else
-            result = hal::Cholesky(a.ptr<double>(), a.step, n, dst.ptr<double>(), dst.step, nb);
+            result = hal::Cholesky64f(a.ptr<double>(), a.step, n, dst.ptr<double>(), dst.step, nb);
+    }
+    else if( method == DECOMP_QR )
+    {
+        Mat rhsMat;
+        if( is_normal || m == n )
+        {
+            src2.copyTo(dst);
+            rhsMat = dst;
+        }
+        else
+        {
+            rhsMat = Mat(m, nb, type);
+            src2.copyTo(rhsMat);
+        }
+
+        if( type == CV_32F )
+            result = hal::QR32f(a.ptr<float>(), a.step, a.rows, a.cols, rhsMat.cols, rhsMat.ptr<float>(), rhsMat.step, NULL) != 0;
+        else
+            result = hal::QR64f(a.ptr<double>(), a.step, a.rows, a.cols, rhsMat.cols, rhsMat.ptr<double>(), rhsMat.step, NULL) != 0;
+
+        if (rhsMat.rows != dst.rows)
+            rhsMat.rowRange(0, dst.rows).copyTo(dst);
     }
     else
     {
@@ -1325,6 +1388,8 @@ bool cv::solve( InputArray _src, InputArray _src2arg, OutputArray _dst, int meth
 
 bool cv::eigen( InputArray _src, OutputArray _evals, OutputArray _evects )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat src = _src.getMat();
     int type = src.type();
     int n = src.rows;
@@ -1433,11 +1498,15 @@ static void _SVDcompute( InputArray _aarr, OutputArray _w,
 
 void SVD::compute( InputArray a, OutputArray w, OutputArray u, OutputArray vt, int flags )
 {
+    CV_INSTRUMENT_REGION()
+
     _SVDcompute(a, w, u, vt, flags);
 }
 
 void SVD::compute( InputArray a, OutputArray w, int flags )
 {
+    CV_INSTRUMENT_REGION()
+
     _SVDcompute(a, w, noArray(), noArray(), flags);
 }
 
@@ -1486,11 +1555,15 @@ void SVD::backSubst( InputArray rhs, OutputArray dst ) const
 
 void cv::SVDecomp(InputArray src, OutputArray w, OutputArray u, OutputArray vt, int flags)
 {
+    CV_INSTRUMENT_REGION()
+
     SVD::compute(src, w, u, vt, flags);
 }
 
 void cv::SVBackSubst(InputArray w, InputArray u, InputArray vt, InputArray rhs, OutputArray dst)
 {
+    CV_INSTRUMENT_REGION()
+
     SVD::backSubst(w, u, vt, rhs, dst);
 }
 

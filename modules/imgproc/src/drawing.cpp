@@ -79,6 +79,8 @@ FillConvexPoly( Mat& img, const Point* v, int npts,
 
 bool clipLine( Size img_size, Point& pt1, Point& pt2 )
 {
+    CV_INSTRUMENT_REGION()
+
     int64 x1, y1, x2, y2;
     int c1, c2;
     int64 right = img_size.width-1, bottom = img_size.height-1;
@@ -138,6 +140,8 @@ bool clipLine( Size img_size, Point& pt1, Point& pt2 )
 
 bool clipLine( Rect img_rect, Point& pt1, Point& pt2 )
 {
+    CV_INSTRUMENT_REGION()
+
     Point tl = img_rect.tl();
     pt1 -= tl; pt2 -= tl;
     bool inside = clipLine(img_rect.size(), pt1, pt2);
@@ -610,12 +614,12 @@ LineAA( Mat& img, Point pt1, Point pt2, const void* color )
                 ICV_PUT_POINT();
                 ICV_PUT_POINT();
 
-                tptr += step;
+                tptr += 4;
                 a = (ep_corr * FilterTable[dist] >> 8) & 0xff;
                 ICV_PUT_POINT();
                 ICV_PUT_POINT();
 
-                tptr += step;
+                tptr += 4;
                 a = (ep_corr * FilterTable[63 - dist] >> 8) & 0xff;
                 ICV_PUT_POINT();
                 ICV_PUT_POINT();
@@ -922,6 +926,8 @@ void ellipse2Poly( Point center, Size axes, int angle,
                    int arc_start, int arc_end,
                    int delta, std::vector<Point>& pts )
 {
+    CV_INSTRUMENT_REGION()
+
     float alpha, beta;
     double size_a = axes.width, size_b = axes.height;
     double cx = center.x, cy = center.y;
@@ -1654,6 +1660,71 @@ PolyLine( Mat& img, const Point* v, int count, bool is_closed,
     }
 }
 
+/* ----------------------------------------------------------------------------------------- */
+/* ADDING A SET OF PREDEFINED MARKERS WHICH COULD BE USED TO HIGHLIGHT POSITIONS IN AN IMAGE */
+/* ----------------------------------------------------------------------------------------- */
+
+void drawMarker(Mat& img, Point position, const Scalar& color, int markerType, int markerSize, int thickness, int line_type)
+{
+    switch(markerType)
+    {
+    // The cross marker case
+    case MARKER_CROSS:
+        line(img, Point(position.x-(markerSize/2), position.y), Point(position.x+(markerSize/2), position.y), color, thickness, line_type);
+        line(img, Point(position.x, position.y-(markerSize/2)), Point(position.x, position.y+(markerSize/2)), color, thickness, line_type);
+        break;
+
+    // The tilted cross marker case
+    case MARKER_TILTED_CROSS:
+        line(img, Point(position.x-(markerSize/2), position.y-(markerSize/2)), Point(position.x+(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x+(markerSize/2), position.y-(markerSize/2)), Point(position.x-(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        break;
+
+    // The star marker case
+    case MARKER_STAR:
+        line(img, Point(position.x-(markerSize/2), position.y), Point(position.x+(markerSize/2), position.y), color, thickness, line_type);
+        line(img, Point(position.x, position.y-(markerSize/2)), Point(position.x, position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x-(markerSize/2), position.y-(markerSize/2)), Point(position.x+(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x+(markerSize/2), position.y-(markerSize/2)), Point(position.x-(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        break;
+
+    // The diamond marker case
+    case MARKER_DIAMOND:
+        line(img, Point(position.x, position.y-(markerSize/2)), Point(position.x+(markerSize/2), position.y), color, thickness, line_type);
+        line(img, Point(position.x+(markerSize/2), position.y), Point(position.x, position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x, position.y+(markerSize/2)), Point(position.x-(markerSize/2), position.y), color, thickness, line_type);
+        line(img, Point(position.x-(markerSize/2), position.y), Point(position.x, position.y-(markerSize/2)), color, thickness, line_type);
+        break;
+
+    // The square marker case
+    case MARKER_SQUARE:
+        line(img, Point(position.x-(markerSize/2), position.y-(markerSize/2)), Point(position.x+(markerSize/2), position.y-(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x+(markerSize/2), position.y-(markerSize/2)), Point(position.x+(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x+(markerSize/2), position.y+(markerSize/2)), Point(position.x-(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x-(markerSize/2), position.y+(markerSize/2)), Point(position.x-(markerSize/2), position.y-(markerSize/2)), color, thickness, line_type);
+        break;
+
+    // The triangle up marker case
+    case MARKER_TRIANGLE_UP:
+        line(img, Point(position.x-(markerSize/2), position.y+(markerSize/2)), Point(position.x+(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x+(markerSize/2), position.y+(markerSize/2)), Point(position.x, position.y-(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x, position.y-(markerSize/2)), Point(position.x-(markerSize/2), position.y+(markerSize/2)), color, thickness, line_type);
+        break;
+
+    // The triangle down marker case
+    case MARKER_TRIANGLE_DOWN:
+        line(img, Point(position.x-(markerSize/2), position.y-(markerSize/2)), Point(position.x+(markerSize/2), position.y-(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x+(markerSize/2), position.y-(markerSize/2)), Point(position.x, position.y+(markerSize/2)), color, thickness, line_type);
+        line(img, Point(position.x, position.y+(markerSize/2)), Point(position.x-(markerSize/2), position.y-(markerSize/2)), color, thickness, line_type);
+        break;
+
+    // If any number that doesn't exist is entered as marker type, draw a cross marker, to avoid crashes
+    default:
+        drawMarker(img, position, color, MARKER_CROSS, markerSize, thickness, line_type);
+        break;
+    }
+}
+
 /****************************************************************************************\
 *                              External functions                                        *
 \****************************************************************************************/
@@ -1661,6 +1732,8 @@ PolyLine( Mat& img, const Point* v, int count, bool is_closed,
 void line( InputOutputArray _img, Point pt1, Point pt2, const Scalar& color,
            int thickness, int line_type, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat();
 
     if( line_type == CV_AA && img.depth() != CV_8U )
@@ -1677,6 +1750,8 @@ void line( InputOutputArray _img, Point pt1, Point pt2, const Scalar& color,
 void arrowedLine(InputOutputArray img, Point pt1, Point pt2, const Scalar& color,
            int thickness, int line_type, int shift, double tipLength)
 {
+    CV_INSTRUMENT_REGION()
+
     const double tipSize = norm(pt1-pt2)*tipLength; // Factor to normalize the size of the tip depending on the length of the arrow
 
     line(img, pt1, pt2, color, thickness, line_type, shift);
@@ -1696,6 +1771,8 @@ void rectangle( InputOutputArray _img, Point pt1, Point pt2,
                 const Scalar& color, int thickness,
                 int lineType, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat();
 
     if( lineType == CV_AA && img.depth() != CV_8U )
@@ -1727,6 +1804,8 @@ void rectangle( Mat& img, Rect rec,
                 const Scalar& color, int thickness,
                 int lineType, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     CV_Assert( 0 <= shift && shift <= XY_SHIFT );
     if( rec.area() > 0 )
         rectangle( img, rec.tl(), rec.br() - Point(1<<shift,1<<shift),
@@ -1737,6 +1816,8 @@ void rectangle( Mat& img, Rect rec,
 void circle( InputOutputArray _img, Point center, int radius,
              const Scalar& color, int thickness, int line_type, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat();
 
     if( line_type == CV_AA && img.depth() != CV_8U )
@@ -1748,7 +1829,7 @@ void circle( InputOutputArray _img, Point center, int radius,
     double buf[4];
     scalarToRawData(color, buf, img.type(), 0);
 
-    if( thickness > 1 || line_type >= CV_AA )
+    if( thickness > 1 || line_type != LINE_8 || shift > 0 )
     {
         center.x <<= XY_SHIFT - shift;
         center.y <<= XY_SHIFT - shift;
@@ -1765,6 +1846,8 @@ void ellipse( InputOutputArray _img, Point center, Size axes,
               double angle, double start_angle, double end_angle,
               const Scalar& color, int thickness, int line_type, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat();
 
     if( line_type == CV_AA && img.depth() != CV_8U )
@@ -1791,6 +1874,8 @@ void ellipse( InputOutputArray _img, Point center, Size axes,
 void ellipse(InputOutputArray _img, const RotatedRect& box, const Scalar& color,
              int thickness, int lineType)
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat();
 
     if( lineType == CV_AA && img.depth() != CV_8U )
@@ -1813,6 +1898,8 @@ void ellipse(InputOutputArray _img, const RotatedRect& box, const Scalar& color,
 void fillConvexPoly( Mat& img, const Point* pts, int npts,
                      const Scalar& color, int line_type, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     if( !pts || npts <= 0 )
         return;
 
@@ -1830,6 +1917,8 @@ void fillPoly( Mat& img, const Point** pts, const int* npts, int ncontours,
                const Scalar& color, int line_type,
                int shift, Point offset )
 {
+    CV_INSTRUMENT_REGION()
+
     if( line_type == CV_AA && img.depth() != CV_8U )
         line_type = 8;
 
@@ -1855,6 +1944,8 @@ void fillPoly( Mat& img, const Point** pts, const int* npts, int ncontours,
 void polylines( Mat& img, const Point* const* pts, const int* npts, int ncontours, bool isClosed,
                 const Scalar& color, int thickness, int line_type, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     if( line_type == CV_AA && img.depth() != CV_8U )
         line_type = 8;
 
@@ -2090,6 +2181,12 @@ void putText( InputOutputArray _img, const String& text, Point org,
               int thickness, int line_type, bool bottomLeftOrigin )
 
 {
+    CV_INSTRUMENT_REGION()
+
+    if ( text.empty() )
+    {
+        return;
+    }
     Mat img = _img.getMat();
     const int* ascii = getFontData(fontFace);
 
@@ -2111,7 +2208,7 @@ void putText( InputOutputArray _img, const String& text, Point org,
     pts.reserve(1 << 10);
     const char **faces = cv::g_HersheyGlyphs;
 
-    for( int i = 0; text[i] != '\0'; i++ )
+    for( int i = 0; i < (int)text.size(); i++ )
     {
         int c = (uchar)text[i];
         Point p;
@@ -2158,7 +2255,7 @@ Size getTextSize( const String& text, int fontFace, double fontScale, int thickn
     int cap_line = (ascii[0] >> 4) & 15;
     size.height = cvRound((cap_line + base_line)*fontScale + (thickness+1)/2);
 
-    for( int i = 0; text[i] != '\0'; i++ )
+    for( int i = 0; i < (int)text.size(); i++ )
     {
         int c = (uchar)text[i];
         Point p;
@@ -2183,6 +2280,8 @@ Size getTextSize( const String& text, int fontFace, double fontScale, int thickn
 void cv::fillConvexPoly(InputOutputArray _img, InputArray _points,
                         const Scalar& color, int lineType, int shift)
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat(), points = _points.getMat();
     CV_Assert(points.checkVector(2, CV_32S) >= 0);
     fillConvexPoly(img, points.ptr<Point>(), points.rows*points.cols*points.channels()/2, color, lineType, shift);
@@ -2192,6 +2291,8 @@ void cv::fillConvexPoly(InputOutputArray _img, InputArray _points,
 void cv::fillPoly(InputOutputArray _img, InputArrayOfArrays pts,
                   const Scalar& color, int lineType, int shift, Point offset)
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat();
     int i, ncontours = (int)pts.total();
     if( ncontours == 0 )
@@ -2216,6 +2317,8 @@ void cv::polylines(InputOutputArray _img, InputArrayOfArrays pts,
                    bool isClosed, const Scalar& color,
                    int thickness, int lineType, int shift )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat img = _img.getMat();
     bool manyContours = pts.kind() == _InputArray::STD_VECTOR_VECTOR ||
                         pts.kind() == _InputArray::STD_VECTOR_MAT;
@@ -2232,6 +2335,7 @@ void cv::polylines(InputOutputArray _img, InputArrayOfArrays pts,
         Mat p = pts.getMat(manyContours ? i : -1);
         if( p.total() == 0 )
         {
+            ptsptr[i] = NULL;
             npts[i] = 0;
             continue;
         }
@@ -2261,10 +2365,10 @@ static void addChildContour(InputArrayOfArrays contours,
 
         int h_next = hierarchy[i][0], h_prev = hierarchy[i][1],
             v_next = hierarchy[i][2], v_prev = hierarchy[i][3];
-        seq[i].h_next = (size_t)h_next < ncontours ? &seq[h_next] : 0;
-        seq[i].h_prev = (size_t)h_prev < ncontours ? &seq[h_prev] : 0;
-        seq[i].v_next = (size_t)v_next < ncontours ? &seq[v_next] : 0;
-        seq[i].v_prev = (size_t)v_prev < ncontours ? &seq[v_prev] : 0;
+        seq[i].h_next = (0 <= h_next && h_next < (int)ncontours) ? &seq[h_next] : 0;
+        seq[i].h_prev = (0 <= h_prev && h_prev < (int)ncontours) ? &seq[h_prev] : 0;
+        seq[i].v_next = (0 <= v_next && v_next < (int)ncontours) ? &seq[v_next] : 0;
+        seq[i].v_prev = (0 <= v_prev && v_prev < (int)ncontours) ? &seq[v_prev] : 0;
 
         if( v_next >= 0 )
             addChildContour(contours, ncontours, hierarchy, v_next, seq, block);
@@ -2277,6 +2381,8 @@ void cv::drawContours( InputOutputArray _image, InputArrayOfArrays _contours,
                    int lineType, InputArray _hierarchy,
                    int maxLevel, Point offset )
 {
+    CV_INSTRUMENT_REGION()
+
     Mat image = _image.getMat(), hierarchy = _hierarchy.getMat();
     CvMat _cimage = image;
 
